@@ -1,16 +1,31 @@
-#include <Arduino.h> // Добавьте эту строку
+#ifndef _LCD_1602_RUS
+#define _LCD_1602_RUS
 
+#if defined(ARDUINO) && ARDUINO >= 100
+  #include "Arduino.h"
+#else
+  #include "WProgram.h"
+#endif 
+
+#include <avr/pgmspace.h>
 #include <LiquidCrystal_I2C.h>
-#include "Print.h"
+#include <Print.h>
 
-#define MAX_SYMBOL_COUNT 8  //Максимальное количество переназначаемых символов от 0 до 7
 #define BYTE 0
+#ifdef ARDUINO_ARCH_AVR
+  typedef uint32_t _uint_farptr_t;
+#else
+  typedef uint8_t* _uint_farptr_t;
+  #ifndef memcpy_PF
+    #define memcpy_PF(dest, src, len) memcpy((dest), (src), (len))
+  #endif
+#endif
 
 class LCD_1602_RUS : public LiquidCrystal_I2C {
 public:
-	LCD_1602_RUS(uint8_t, uint8_t, uint8_t);
-	void print(const wchar_t[]);
-	void print(const char[]);
+  LCD_1602_RUS(uint8_t, uint8_t, uint8_t, uint8_t = 0);
+  void print(const wchar_t[]);
+  void print(const char[]);
   void print(int, int = DEC);
   void print(unsigned int, int = DEC);
   void print(long, int = DEC);
@@ -20,14 +35,18 @@ public:
   void print(unsigned char, int = BYTE);
   void print(double, int = 2);
   void clear();
-	void setCursor(uint8_t, uint8_t); 
-	uint8_t getCursorCol(); 
-	uint8_t getCursorRow(); 
+  void setCursor(uint8_t, uint8_t); 
+  uint8_t getCursorCol(); 
+  uint8_t getCursorRow(); 
+  wchar_t *asciiutf8(unsigned char);
 
 private:
   void CharSetToLCD(uint8_t *, uint8_t *);
   void ResetAllIndex();
+  void printwc(const wchar_t);
+  uint8_t mbtowc(wchar_t *, char *, uint8_t);
 
+  uint8_t max_symbol_count;  //Максимальное количество переназначаемых символов (по умолчанию 8: от 0 до 7)
   int symbol_index;//Индекс символа (от 0 до 7)
   uint8_t cursor_col;
   uint8_t cursor_row;
@@ -82,51 +101,55 @@ private:
   uint8_t index_rus_ya;
 };
 
-extern const byte rus_B[];
-extern const byte rus_G[];
-extern const byte rus_D[];
-extern const byte rus_ZH[];
-extern const byte rus_Z[];
-extern const byte rus_I[];
-extern const byte rus_II[];
-extern const byte rus_L[];
-extern const byte rus_P[];
-extern const byte rus_U[];
-extern const byte rus_F[];
-extern const byte rus_TS[];
-extern const byte rus_CH[];
-extern const byte rus_SH[];
-extern const byte rus_SCH[];
-extern const byte rus_tverd[];
-extern const byte rus_Y[];
-extern const byte rus_myagk[];
-extern const byte rus_EE[];
-extern const byte rus_YU[];
-extern const byte rus_YA[];
-extern const byte rus_b[];
-extern const byte rus_v[];
-extern const byte rus_g[];
-extern const byte rus_d[];
-extern const byte rus_yo[];
-extern const byte rus_zh[];
-extern const byte rus_z[];
-extern const byte rus_i[];
-extern const byte rus_ii[];
-extern const byte rus_k[];
-extern const byte rus_l[];
-extern const byte rus_m[];
-extern const byte rus_n[];
-extern const byte rus_p[];
-extern const byte rus_t[];
-extern const byte rus_u[];
-extern const byte rus_f[];
-extern const byte rus_ts[];
-extern const byte rus_ch[];
-extern const byte rus_sh[];
-extern const byte rus_sch[];
-extern const byte rus_tverd_mal[];
-extern const byte rus_y[];
-extern const byte rus_myagk_mal[];
-extern const byte rus_ee[];
-extern const byte rus_yu[];
-extern const byte rus_ya[];
+extern const uint8_t rus_B[];
+extern const uint8_t rus_G[];
+extern const uint8_t rus_D[];
+extern const uint8_t rus_ZH[];
+extern const uint8_t rus_Z[];
+extern const uint8_t rus_I[];
+extern const uint8_t rus_II[];
+extern const uint8_t rus_L[];
+extern const uint8_t rus_P[];
+extern const uint8_t rus_U[];
+extern const uint8_t rus_F[];
+extern const uint8_t rus_TS[];
+extern const uint8_t rus_CH[];
+extern const uint8_t rus_SH[];
+extern const uint8_t rus_SCH[];
+extern const uint8_t rus_tverd[];
+extern const uint8_t rus_Y[];
+extern const uint8_t rus_myagk[];
+extern const uint8_t rus_EE[];
+extern const uint8_t rus_YU[];
+extern const uint8_t rus_YA[];
+extern const uint8_t rus_b[];
+extern const uint8_t rus_v[];
+extern const uint8_t rus_g[];
+extern const uint8_t rus_d[];
+extern const uint8_t rus_yo[];
+extern const uint8_t rus_zh[];
+extern const uint8_t rus_z[];
+extern const uint8_t rus_i[];
+extern const uint8_t rus_ii[];
+extern const uint8_t rus_k[];
+extern const uint8_t rus_l[];
+extern const uint8_t rus_m[];
+extern const uint8_t rus_n[];
+extern const uint8_t rus_p[];
+extern const uint8_t rus_t[];
+extern const uint8_t rus_u[];
+extern const uint8_t rus_f[];
+extern const uint8_t rus_ts[];
+extern const uint8_t rus_ch[];
+extern const uint8_t rus_sh[];
+extern const uint8_t rus_sch[];
+extern const uint8_t rus_tverd_mal[];
+extern const uint8_t rus_y[];
+extern const uint8_t rus_myagk_mal[];
+extern const uint8_t rus_ee[];
+extern const uint8_t rus_yu[];
+extern const uint8_t rus_ya[];
+
+extern wchar_t char_utf8[];
+
+#endif

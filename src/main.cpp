@@ -1,9 +1,10 @@
-#include <Arduino.h>
 #include "pitches.h"
-#include <LCD_1602_RUS.h>
+#include <Arduino.h>
 #include <microDS18B20.h>
+#include <Wire.h>
+#include <LCD_1602_RUS.h>
 
-LCD_1602_RUS lcd(0x27, 16, 2); // Устанавливаем дисплей (адрес, и т.д.)
+LCD_1602_RUS lcd(0x27, 16, 2);
 
 MicroDS18B20<2> sensor_HW;  // датчик температуры горячей воды (D2)
 MicroDS18B20<9> sensor_CW;  // датчик температуры холодной воды (D9)
@@ -21,17 +22,21 @@ void btnClick();
 void HWscreenWrite();
 void CWscreenWrite();
 void PRNscreenWrite();
+void updateLCD(String, String);
 
 int nScreen = 0;
+int cycles = 0;
+String lastScreen;
 
 void setup()
 {
   Serial.begin(115200);
 
-  lcd.init(); // инициализация LCD.
+  lcd.init();
   lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print(L"start"); // Выводим сообщение.
+  lcd.setCursor(5, 0);
+  lcd.print("Привет");
+
   delay(500);
 
   pinMode(Button, INPUT);   // Инициализируем пин, подключенный к кнопке, как вход (кнопка)INPUT_PULLUP
@@ -48,8 +53,27 @@ void setup()
 void loop()
 {
   if (digitalRead(Button) == 1) btnClick();
-  HWscreenWrite();
-  delay(100);
+
+  switch (nScreen)
+  {
+    case 0: HWscreenWrite(); break;
+    case 1: CWscreenWrite(); break;
+    case 2: PRNscreenWrite(); break;
+    default: break;
+  }
+
+  cycles++;
+
+  if(cycles == 1000) {
+    
+    String log = 
+      " HW: " + String(sensor_HW.getTemp()) + 
+      " CW: " + String(sensor_CW.getTemp()) +
+      " PRN: " + String(sensor_PRN.getTemp());
+
+    Serial.println(log);
+    cycles = 0;
+  }
 }
 
 void successfulInclusion()
@@ -80,28 +104,32 @@ void btnClickSound()
 
 void HWscreenWrite() {
   float t = sensor_HW.getTemp();
-  String str1 = "Горячая вода"; 
-  String str2 = String(t) + " °C";
-
-  
-  lcd.clear();
-  lcd.setCursor(2, 0);
-  lcd.print(str1);
-  lcd.setCursor(4, 1);
-  lcd.print(str2);
-  
-  Serial.print("\nstr1: ");
-  Serial.println(str1);
-  Serial.print("str2: ");
-  Serial.println(str2);
-  Serial.print("Temperature: ");
-  Serial.println(t);
+  updateLCD("Горячая вода", String(t) + " °C");
 }
 
 void CWscreenWrite() {
-
+  float t = sensor_CW.getTemp();
+  updateLCD("Холодная вода", String(t) + " °C");
 }
 
 void PRNscreenWrite() {
+  float t = sensor_PRN.getTemp();
+  updateLCD("Темп. парной", String(t) + " °C");
+}
 
+void updateLCD(String str1, String str2) {
+  if (lastScreen == str1 + str2) return; else lastScreen = str1 + str2;
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(str1);
+  lcd.setCursor(4, 1);
+  lcd.print(str2);
+
+  Serial.println("\n---Update screen---");
+  String log = 
+      " HW: " + String(sensor_HW.getTemp()) + 
+      " CW: " + String(sensor_CW.getTemp()) +
+      " PRN: " + String(sensor_PRN.getTemp()) + "\n";
+  Serial.println(log);
 }

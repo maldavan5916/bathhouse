@@ -1,3 +1,8 @@
+Внимание: новая объединенная версия библиотек для подключения экрана как по I2C, так и посредством 10 контактов здесь:
+https://github.com/ssilver2007/LCD_1602_RUS_ALL
+
+LCD_1602_RUS больше обновляться не будет.
+
 # LCD_1602_RUS
 Arduino LCD 16x02 display with I2C interface RUSSIAN with NO CYRILLIC symbols set
 
@@ -7,13 +12,18 @@ Arduino LCD 16x02 display with I2C interface RUSSIAN with NO CYRILLIC symbols se
 Дополнительно встроена возможность печати знака градуса Цельсия. Для этого в тексте программы необходимо набрать
 код UTF-8 (Alt+0176)
 
-Должна быть установелна базовая библиотека LiquidCrystal_I2C: https://github.com/marcoschwartz/LiquidCrystal_I2C
+Должна быть установелна базовая библиотека LiquidCrystal_I2C.
+Для Arduino, например, может быть рекомендована эта: https://github.com/marcoschwartz/LiquidCrystal_I2C
 
-Возможные ошибки при компиляции примеров:
-1) Ошибка "exit status 1
-converting to execution character set: Illegal byte sequence"
-Решение: сохранить измененный скетч в новое место на диске с другим именем.
+Файлы примеров:
 
+HelloWorld - простой пример вывода кириллических символов на LCD экран
+
+HelloWorldCustom - пример вывода задаваемых пользователем и кириллических символов на LCD  экран
+
+SerialToLCD - Ввод символов (в т.ч. кириллических) с монитора порта и их вывод на LCD экран
 
 (c) Сергей Сироткин
-По вопросам обращаться: ssilver2007@rambler.ru
+
+По вопросам обращаться:
+ssilver2007@rambler.ru
