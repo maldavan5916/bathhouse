@@ -1,34 +1,35 @@
 #include "pitches.h"
 #include <Arduino.h>
-#include <microDS18B20.h>
 #include <Wire.h>
 #include <LCD_1602_RUS.h>
+#include <GyverDS18.h>
 
-//============================================Setings===================================================\\
-
-LCD_1602_RUS lcd(0x27, 16, 2);
-
-MicroDS18B20<2> sensor_HW;  // датчик температуры горячей воды (D2)
-MicroDS18B20<9> sensor_CW;  // датчик температуры холодной воды (D9)
-MicroDS18B20<7> sensor_PRN; // датчик температуры парной (D7)
-
-const int Button = 5;  // Номер пина подключения кнопки
-const int SSR100 = 10; // Номер пина подключения SSR100
-const int Heater = 12; // Номер выхода нагреватель счётчика
-const int Alarm = 13;  // Номер выхода Alarm
-const long interval = 1000;      // Интервал опраса датчиков времени в миллисекундах (1 секунда)
+//============================================Setings===================================================
+LCD_1602_RUS lcd(0x27, 16, 2);               // адрес дисплея и его размерность (16x2)
+GyverDS18Single sensor_HW(2);                // датчик температуры горячей воды (D2)
+GyverDS18Single sensor_CW(9);                // датчик температуры холодной воды (D9)
+GyverDS18Single sensor_PRN(7);               // датчик температуры парной (D7)
+const int Button = 5;                        // Номер пина подключения кнопки
+const int Heater = 12;                       // Номер выхода нагреватель счётчика
+const int Alarm = 13;                        // Номер выхода Alarm
+const int interval = 1000;                   // Интервал опраса датчиков времени в миллисекундах (1 секунда)
+const unsigned long intervalCheck = 300000;  // Интервал проверки тепературы счётчика (5 мин)
+const int extremelyLowTemp = 30;             // предельно низкая температура счётчика
+const int longBtnClickTime = 300;            // время длинного нажатия кнопки
 const int melody[] = {NOTE_A7, NOTE_G7, NOTE_E7, NOTE_C7, NOTE_D7, NOTE_B7, NOTE_F7, NOTE_C7}; // мелоди при успешном включении
+//============================================Setings===================================================
 
-//======================================================================================================\\
+int nScreen = 0;
+String lastScreen;
+unsigned long previousMillis = 0;
+unsigned long lastCheck = 0;
 
 void successfulInclusion();
 void btnClickSound();
 void btnClick();
 void updateLCD(String, String);
-
-int nScreen = 0;
-String lastScreen;
-unsigned long previousMillis = 0; // Переменная для хранения времени последнего вызова функции
+String getTemp(GyverDS18Single);
+int getTempInt(GyverDS18Single);
 
 void setup()
 {
@@ -41,8 +42,7 @@ void setup()
   
   delay(500);
   
-  pinMode(Button, INPUT);   // Инициализируем пин, подключенный к кнопке, как вход (кнопка)INPUT_PULLUP
-  pinMode(SSR100, OUTPUT);  // Инициализируем пин, подключенный к светодиоду, как выход (SSR100)
+  pinMode(Button, INPUT);   // Инициализируем пин, подключенный к кнопке, как вход (кнопка)
   pinMode(Heater, OUTPUT);  // Инициализируем пин, подключенный к светодиоду, как выход (нагреватель счётчика)
   pinMode(Alarm, OUTPUT);   // Инициализируем пин, подключенный к светодиоду, как выход (Alarm)
   digitalWrite(Alarm, LOW); // выключаем Alarm
@@ -60,38 +60,39 @@ void loop()
   
   switch (nScreen)
   {
-    case 0: { updateLCD("Горячая вода    ", String(sensor_HW.getTemp()) + " °C"); } break;
-    case 1: { updateLCD("Холодная вода   ", String(sensor_CW.getTemp()) + " °C"); } break;
-    case 2: { updateLCD("Темп. парной    ", String(sensor_PRN.getTemp()) + " °C"); } break;
-    case 3: { updateLCD("ПРОГРЕВ СЧЁТЧИКА", String(sensor_CW.getTemp()) + " °C"); } break;
+    case 0: { updateLCD("Горячая вода",     getTemp(sensor_HW)); } break;
+    case 1: { updateLCD("Холодная вода",    getTemp(sensor_CW)); } break;
+    case 2: { updateLCD("Темп. парной",     getTemp(sensor_PRN)); } break;
+    case 3: { updateLCD("ПРОГРЕВ СЧЁТЧИКА", ""); } break;
   }
 
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     
-    sensor_HW.requestTemp();
-    sensor_CW.requestTemp();
-    sensor_PRN.requestTemp();
-    
     Serial.println(
-      " HW: " + String(sensor_HW.getTemp()) +
-      " CW: " + String(sensor_CW.getTemp()) +
-      " PRN: " + String(sensor_PRN.getTemp())
+      " HW: " + getTemp(sensor_HW) +
+      " CW: " + getTemp(sensor_CW) +
+      " PRN: " +  getTemp(sensor_PRN)
     );
   }
 
-  if (sensor_CW.getTemp() < 30) {
-    nScreen = 3;
-    digitalWrite(Heater, HIGH);  // включаем нагреватель
-    
-    digitalWrite(Alarm, HIGH);  // включаем сигнал
-    delay(50);
-    digitalWrite(Alarm, LOW);  // выключаем сигнал
-    
-    Serial.println("\nWARMING THE COUNTER\n");
-  } else {
-    nScreen = 0;
+  if (currentMillis - lastCheck >= intervalCheck) {
+    lastCheck = currentMillis;
+    if (getTempInt(sensor_CW) < extremelyLowTemp) {
+      nScreen = 3;
+      digitalWrite(Heater, HIGH);  // включаем нагреватель
+      
+      digitalWrite(Alarm, HIGH);  // включаем сигнал
+      delay(50);
+      digitalWrite(Alarm, LOW);  // выключаем сигнал
+      
+      Serial.println("\nWARMING THE COUNTER\n");
+    }
+    else {
+      digitalWrite(Heater, LOW);  // выключаем нагреватель
+      nScreen = 1;
+    }
   }
 }
 
@@ -107,6 +108,19 @@ void successfulInclusion()
 
 void btnClick() {
   btnClickSound();
+
+  unsigned long start = millis();
+  bool isLongClik = false;
+  while (digitalRead(Button) == 1)
+  {
+    if (millis() - start == longBtnClickTime) {
+      btnClickSound();
+      Serial.println("\nButton long clicked\n");
+      isLongClik = true;
+    }
+  }
+  if (isLongClik) return; // действие при долгои нажатии на кнопку
+  
   nScreen++;
   if (nScreen >= 3) nScreen = 0;
   delay(250);
@@ -131,4 +145,24 @@ void updateLCD(String str1, String str2) {
   lcd.print(str2);
   
   Serial.println("\nLCD updated\n");
+}
+
+String getTemp(GyverDS18Single sensor) {
+  sensor.requestTemp();
+    if (sensor.readTemp()) {
+      return String(sensor.getTempInt()) + " °C";
+    }
+    else {
+      return "Ошибка!";
+    }
+}
+
+int getTempInt(GyverDS18Single sensor) {
+  sensor.requestTemp();
+    if (sensor.readTemp()) {
+      return sensor.getTempInt();
+    }
+    else {
+      return -1;
+    }
 }
