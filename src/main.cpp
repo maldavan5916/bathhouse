@@ -12,10 +12,14 @@ GyverDS18Single sensor_PRN(7);               // датчик температу�
 const int Button = 5;                        // Номер пина подключения кнопки
 const int Heater = 12;                       // Номер выхода нагреватель счётчика
 const int Alarm = 13;                        // Номер выхода Alarm
+const int heaterHW = 10;                     // номер пина к кторому подключен нагреватель
 const int interval = 1000;                   // Интервал опраса датчиков времени в миллисекундах (1 секунда)
-const unsigned long intervalCheck = 300000;  // Интервал проверки тепературы счётчика (5 мин)
-const int extremelyLowTemp = 30;             // предельно низкая температура счётчика
-const int longBtnClickTime = 300;            // время длинного нажатия кнопки
+const unsigned long intervalCheck = 300000;  // Интервал проверки тепературы счётчика в милисекундах (5 мин)
+const int extremelyLowTemp = 3;              // предельно низкая температура счётчика
+const int MeterTemperature = 10;             // тепература до которой будет прогрет счетчик
+const int longBtnClickTime = 300;            // время длинного нажатия кнопки милисекунд
+const int HeatingHWTime = 60;                // время подогрева горячей воды в минутах
+const int extremelyMaxTemp = 70;             // максимальная температура горячей воды
 const int melody[] = {NOTE_A7, NOTE_G7, NOTE_E7, NOTE_C7, NOTE_D7, NOTE_B7, NOTE_F7, NOTE_C7}; // мелоди при успешном включении
 //============================================Setings===================================================
 
@@ -23,6 +27,9 @@ int nScreen = 0;
 String lastScreen;
 unsigned long previousMillis = 0;
 unsigned long lastCheck = 0;
+unsigned long lastDecrementHW = 0;
+int currentHeatingHWTime = 0;
+bool IsHeatingMeter = false;
 
 void successfulInclusion();
 void btnClickSound();
@@ -30,6 +37,7 @@ void btnClick();
 void updateLCD(String, String);
 String getTemp(GyverDS18Single);
 int getTempInt(GyverDS18Single);
+void SetHeatingHW();
 
 void setup()
 {
@@ -45,6 +53,7 @@ void setup()
   pinMode(Button, INPUT);   // Инициализируем пин, подключенный к кнопке, как вход (кнопка)
   pinMode(Heater, OUTPUT);  // Инициализируем пин, подключенный к светодиоду, как выход (нагреватель счётчика)
   pinMode(Alarm, OUTPUT);   // Инициализируем пин, подключенный к светодиоду, как выход (Alarm)
+  pinMode(heaterHW, OUTPUT);
   digitalWrite(Alarm, LOW); // выключаем Alarm
 
   Serial.println("===START===");
@@ -60,8 +69,14 @@ void loop()
   
   switch (nScreen)
   {
-    case 0: { updateLCD("Горячая вода",     getTemp(sensor_HW)); } break;
-    case 1: { updateLCD("Холодная вода",    getTemp(sensor_CW)); } break;
+    case 0: {
+      String addStr = currentHeatingHWTime > 0 ? "         " + String(currentHeatingHWTime) : "";
+      updateLCD("Горячая вода", getTemp(sensor_HW) + addStr); 
+    } break;
+    case 1: { 
+      String addStr = IsHeatingMeter ? "   подогрев" : "";
+      updateLCD("Холодная вода", getTemp(sensor_CW) + addStr); 
+    } break;
     case 2: { updateLCD("Темп. парной",     getTemp(sensor_PRN)); } break;
     case 3: { updateLCD("ПРОГРЕВ СЧЁТЧИКА", ""); } break;
   }
@@ -82,18 +97,25 @@ void loop()
     if (getTempInt(sensor_CW) < extremelyLowTemp) {
       nScreen = 3;
       digitalWrite(Heater, HIGH);  // включаем нагреватель
+      IsHeatingMeter = true;
       
       digitalWrite(Alarm, HIGH);  // включаем сигнал
       delay(50);
       digitalWrite(Alarm, LOW);  // выключаем сигнал
       
-      Serial.println("\nWARMING THE COUNTER\n");
+      Serial.println("\nWARMING THE COUNTER ON\n");
     }
-    else {
+    else if (getTempInt(sensor_CW) >= MeterTemperature){
       digitalWrite(Heater, LOW);  // выключаем нагреватель
-      nScreen = 1;
+      IsHeatingMeter = false;
     }
   }
+
+  if (currentMillis - lastDecrementHW >= 60000 && currentHeatingHWTime > 0) {
+    currentHeatingHWTime--;
+    lastDecrementHW = currentMillis;
+    if (currentHeatingHWTime == 0 || getTempInt(sensor_HW) >= extremelyMaxTemp) digitalWrite(heaterHW, LOW);
+  }  
 }
 
 void successfulInclusion()
@@ -119,7 +141,10 @@ void btnClick() {
       isLongClik = true;
     }
   }
-  if (isLongClik) return; // действие при долгои нажатии на кнопку
+  if (isLongClik) {
+    SetHeatingHW();  // действие при долгой нажатии на кнопку
+    return;
+  };
   
   nScreen++;
   if (nScreen >= 3) nScreen = 0;
@@ -150,7 +175,7 @@ void updateLCD(String str1, String str2) {
 String getTemp(GyverDS18Single sensor) {
   sensor.requestTemp();
     if (sensor.readTemp()) {
-      return String(sensor.getTempInt()) + " °C";
+      return String(sensor.getTempInt()) + "°C";
     }
     else {
       return "Ошибка!";
@@ -165,4 +190,23 @@ int getTempInt(GyverDS18Single sensor) {
     else {
       return -1;
     }
+}
+
+void SetHeatingHW() {
+  if (nScreen != 0) return;
+
+  if (currentHeatingHWTime == 0) { 
+    currentHeatingHWTime = HeatingHWTime;
+    digitalWrite(heaterHW, HIGH);
+
+    Serial.println("HeatingHW ON");
+  }
+  else {
+    currentHeatingHWTime = 0;
+    digitalWrite(heaterHW, LOW);
+
+    Serial.println("HeatingHW OFF");
+  }
+
+  lastDecrementHW = millis();
 }
